@@ -1,6 +1,7 @@
 variable "config" {
     default = {
         vpc_id = "vpc-b91664dc"
+        key_name = "mperrone"
     }
 }
 
@@ -32,6 +33,7 @@ resource "aws_instance" "server" {
     ami = "ami-17928327"
     instance_type = "t2.micro"
     security_groups = ["${aws_security_group.allow_all.name}"]
+    key_name = "${var.config.key_name}"
 
     tags {
         Name = "HelloWorld"
