@@ -15,13 +15,22 @@
     "inline": [
       "sudo apt-get update",
       "sudo apt-get -y install python-pip",
-      "sudo pip install flask",
+      "sudo pip install flask gunicorn",
       "sudo mkdir -p /opt/{{user `app_name`}}",
       "sudo chown ubuntu /opt/{{user `app_name`}}"
     ]
   }, {
     "type": "file",
     "source": "{{user `app_name`}}",
-    "destination": "/opt/{{user `app_name`}}"
+    "destination": "/opt/{{user `app_name`}}/"
+  }, {
+    "type": "file",
+    "source": "build/script/run_app.sh",
+    "destination": "/opt/{{user `app_name`}}/run_app.sh"
+  }, {
+    "type": "shell",
+    "inline": [
+      "sudo chmod +x "/opt/{{user `app_name`}}/run_app.sh"
+    ]
   }]
 }
