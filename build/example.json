@@ -14,7 +14,7 @@
     "type": "shell",
     "inline": [
       "sudo apt-get update",
-      "sudo apt-get -y install python-pip",
+      "sudo apt-get -y install python-pip upstart",
       "sudo pip install flask gunicorn",
       "sudo mkdir -p /opt/{{user `app_name`}}",
       "sudo chown ubuntu /opt/{{user `app_name`}}"
@@ -28,9 +28,15 @@
     "source": "build/script/run_app.sh",
     "destination": "/opt/{{user `app_name`}}/run_app.sh"
   }, {
+    "type": "file",
+    "source": "build/conf/upstart.conf",
+    "destination": "/tmp/{{user `app_name`}}-upstart.conf"
+  },
+  {
     "type": "shell",
     "inline": [
-      "sudo chmod +x "/opt/{{user `app_name`}}/run_app.sh"
+      "sudo chmod +x /opt/{{user `app_name`}}/run_app.sh",
+      "sudo mv /tmp/{{user `app_name`}}-upstart.conf /etc/init/{{user `app_name`}}.conf"
     ]
   }]
 }
