@@ -1,0 +1,15 @@
+<html>
+  <head>
+    {% block head %}
+    <title>{% block title %}{% endblock %} - website title</title>
+    {% endblock %}
+  </head>
+  <body>
+    <div id="content">{% block content %}{% endblock %}</div>
+    <div id="footer">
+      {% block footer %}
+      <p><a href="/logout">Logout</a></p>
+      {% endblock %}
+    </div>
+  </body>
+</html>

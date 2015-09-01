@@ -26,12 +26,17 @@ CLIENT_ID = os.environ['ASANA_CLIENT_ID']
 CLIENT_SECRET = os.environ['ASANA_CLIENT_SECRET']
 
 
-# convience method to create a client with your credentials, and optionally a 'token'
+def token_updater(token):
+    session["token"] = token
+# convience method to create an auto refreshing client with your credentials
 def Client(**kwargs):
     return asana.Client.oauth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri='http://localhost:5000/auth/asana/callback',
+        auto_refresh_url=asana.session.AsanaOAuth2Session.token_url,
+        auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
+        token_updater=token_updater,
         **kwargs
     )
 
@@ -54,17 +59,10 @@ def set_workspace():
     if request.method == "POST":
         form = WorkspaceSelectionForm()
         form.workspace.choices = [(ws["id"], ws["name"]) for ws in session["workspaces"]]
-        session["workspace"] = form.data["workspace"]
+        session["workspace"] = next(x for x in session["workspaces"] if int(x["id"]) == int(form.data["workspace"]))
         return redirect(url_for('set_project'))
     elif token:
-        def token_updater(token):
-            session["token"] = token
-        client = Client(
-            token=token,
-            auto_refresh_url=REFRESH_URL,
-            auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
-            token_updater=token_updater,
-        )
+        client = Client(token=token)
         me = client.users.me()
         form = WorkspaceSelectionForm()
         session["workspaces"] = me["workspaces"]
@@ -80,21 +78,14 @@ def set_project():
         form.project.choices = [(p["id"], p["name"]) for p in session["projects"]]
 
         session["project"] = form.data["project"]
-        return jsonify(dict(session))
+        return redirect(url_for('add_task'))
     elif token:
-        def token_updater(token):
-            session["token"] = token
-        client = Client(
-            token=token,
-            auto_refresh_url=REFRESH_URL,
-            auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
-            token_updater=token_updater,
-        )
-        projects = list(client.projects.find_all(workspace=session["workspace"], limit=25))
+        client = Client(token=token)
+        projects = list(client.projects.find_all(workspace=session["workspace"]["id"], limit=25))
         form = ProjectSelectionForm()
         session["projects"] = projects
         form.project.choices = [(p["id"], p["name"]) for p in projects]
-        return render_template("select_project.html", form=form)
+        return render_template("select_project.html", form=form, workspace=session["workspace"]["name"])
 
 
 class TaskForm(Form):
@@ -108,56 +99,33 @@ def add_task():
     token = session.get('token', False)
     if request.method == "GET":
         form = TaskForm()
-        return render_template("add_task.html", form=form)
-
+        return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
     elif token:
-        def token_updater(token):
-            session["token"] = token
-        client = Client(
-            token=token,
-            auto_refresh_url=REFRESH_URL,
-            auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
-            token_updater=token_updater,
-        )
+        client = Client(token=token)
         form = TaskForm()
         task = client.tasks.create({
-            "workspace": session["workspace"]["name"],
+            "workspace": session["workspace"]["id"],
             "name": form.data["title"],
             "notes": form.data["description"],
-            "assignee": session["user_id"],
+            "assignee": session["user"]["id"],
             "projects": [session["project"]],
         })
+        return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
 
 
 @app.route("/")
 def index():
     token = session.get('token', False)
     if token:
-        def token_updater(token):
-            session["token"] = token
-        client = Client(
-            token=token,
-            auto_refresh_url=REFRESH_URL,
-            auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
-            token_updater=token_updater,
-        )
-        me = client.users.me()
-        session["user_name"] = me["name"]
-        session["user_id"] = me["id"]
+        if not session.get("user"):
+            client = Client(token=token)
+            me = client.users.me()
+            session["user"] = {"name": me["name"], "id": me["id"], "photo": me.get("photo", {})}
+        if not session.get("workspace"):
+            return redirect(url_for("set_workspace"))
+        if not session.get("project"):
+            return redirect(url_for("set_project"))
 
-        task = client.tasks.create({
-            "workspace": session["workspace"]["id"],
-            "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzz baby",
-            "notes": "zomg zomg zomg zomg zomg zomg zomg zomg zomg zomg zomg zomg",
-            "assignee": session["user_id"],
-            "projects": [session["project"]],
-        })
-        # me["taskzz"] = task
-        # me["projectzz"] = list(client.projects.find_all(workspace=46626782955421, limit=5))
-
-        form = WorkspaceSelectionForm()
-        session["workspaces"] = me["workspaces"]
-        form.workspace.choices = [(ws["id"], ws["name"]) for ws in me["workspaces"]]
         return render_template_string(
             '''
 {%- if image_url -%}
@@ -166,8 +134,8 @@ def index():
 <p>Hello {{ name }}.</p>
 <p><pre>{{ dump }}</pre></p>
 <p><a href="/logout">Logout</a></p>''',
-            name=me['name'],
-            image_url=me.get('photo', {}).get('image_60x60', None),
+            name=session["user"]["name"],
+            image_url=session["user"]["photo"].get('image_60x60', None),
             dump=json.dumps(dict(session), indent=2)
         )
     else:

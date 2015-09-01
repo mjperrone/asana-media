@@ -1,15 +1,10 @@
-<html>
-  <head>
-    <title>Welcome to microblog</title>
-  </head>
-  <body>
-      <h1>Hello, {{ name }}!</h1>
-      <p>Select a workspace:</p>
-      <form action="{{ url_for('set_workspace') }}" method=POST>
-        {{ form.hidden_tag() }}
-        {{ form.workspace }}
-        {{ form.submit }}
-      </form>
-      <p><a href="/logout">Logout</a></p>
-  </body>
-</html>
+{% extends "layout.html" %}
+{% block title %}Select Workspace{% endblock %}
+{% block content %}
+  <p>Select a workspace:</p>
+  <form action="{{ url_for('set_workspace') }}" method=POST>
+    {{ form.hidden_tag() }}
+    {{ form.workspace }}
+    {{ form.submit }}
+  </form>
+{% endblock %}
