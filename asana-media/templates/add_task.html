@@ -1,11 +1,23 @@
 {% extends "layout.html" %}
+{% block head %}
+  <script type="text/javascript" src="{{ url_for('static', filename='js.js') }}"></script>
+{% endblock %}
 {% block title %}Add Task{% endblock %}
 {% block content %}
-      <p>Add a task in workspace <a href="{{ url_for('set_workspace') }}"> {{ workspace }}</a>:</p>
-      <form action="{{ url_for('add_task') }}" method=POST>
-        {{ form.hidden_tag() }}
-        {{ form.title }}
-        {{ form.description }}
-        {{ form.submit }}
-      </form>
+  {% if task_title is defined %}
+    <div>Task '{{ task_title }}' successfully added to project '{{ project }}'! <a href="https://app.asana.com/0/{{ project_id }}/list"> View your full queue here</div>.
+  {% endif %}
+  <h3>Add a task in workspace <a href="{{ url_for('set_workspace') }}"> {{ workspace }}</a></h3>
+  <form action="{{ url_for('add_task') }}" method=POST>
+    {{ form.hidden_tag() }}
+    {{ form.title.label }}
+    {{ form.title(class='form-control') }}
+    {{ form.url.label }}
+    {{ form.url(class='form-control') }}
+    <button type="button" class="btn pull-right btn-default" tabindex="100" onclick="get_title()">Suggest Title</button>
+    {{ form.assign_to_me.label }}
+    {{ form.assign_to_me }}
+    <br>
+    {{ form.submit(class='btn btn-default') }}
+  </form>
 {% endblock %}

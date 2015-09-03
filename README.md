@@ -2,6 +2,12 @@
 Service to easily add links to your asana project to read later!
 
 
+##Development
+```
+FLASK_DEBUG=True python -m asana-media.asana-media
+```
+
+
 ##Build
 ```
 packer build build/packer.json

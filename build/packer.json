@@ -29,6 +29,10 @@
     "destination": "/opt/{{user `app_name`}}/run_app.sh"
   }, {
     "type": "file",
+    "source": "build/script/conf.sh",
+    "destination": "/opt/{{user `app_name`}}/conf.sh"
+  }, {
+    "type": "file",
     "source": "build/conf/upstart.conf",
     "destination": "/tmp/{{user `app_name`}}-upstart.conf"
   }, {

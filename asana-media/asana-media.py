@@ -1,26 +1,18 @@
 """"""
-import json
 import logging
 import os
 import asana
 from flask import Flask, request, session, redirect, render_template_string, render_template, jsonify, url_for
+import urlparse
 
 from flask_wtf import Form
-from wtforms import SelectField, SubmitField, TextAreaField, StringField
+from wtforms import SelectField, SubmitField, StringField, BooleanField
 from wtforms.validators import DataRequired
+
+from reddit.utils import get_title
 
 log = logging.getLogger(__name__)
 
-
-# OAuth Instructions:
-#
-# 1. create a new application in your Asana Account Settings ("App" panel)
-# 2. set the redirect URL to "http://localhost:5000/auth/asana/callback" (or whichever port you choose)
-# 3. set your ASANA_CLIENT_ID and ASANA_CLIENT_SECRET environment variables
-
-AUTHORIZATION_URL = "https://app.asana.com/-/oauth_authorize"
-TOKEN_URL = "https://app.asana.com/-/oauth_token"
-REFRESH_URL = TOKEN_URL
 
 CLIENT_ID = os.environ['ASANA_CLIENT_ID']
 CLIENT_SECRET = os.environ['ASANA_CLIENT_SECRET']
@@ -28,6 +20,8 @@ CLIENT_SECRET = os.environ['ASANA_CLIENT_SECRET']
 
 def token_updater(token):
     session["token"] = token
+
+
 # convience method to create an auto refreshing client with your credentials
 def Client(**kwargs):
     return asana.Client.oauth(
@@ -41,16 +35,12 @@ def Client(**kwargs):
     )
 
 
+app = Flask(__name__)
+
+
 class WorkspaceSelectionForm(Form):
     workspace = SelectField("workspace", validators=[DataRequired()])
     submit = SubmitField("Submit")
-
-
-class ProjectSelectionForm(Form):
-    project = SelectField("project", validators=[DataRequired()])
-    submit = SubmitField("Submit")
-
-app = Flask(__name__)
 
 
 @app.route('/workspace', methods=["GET", "POST"])
@@ -70,14 +60,18 @@ def set_workspace():
         return render_template("select_workspace.html", name=me['name'], form=form)
 
 
+class ProjectSelectionForm(Form):
+    project = SelectField("project", validators=[DataRequired()])
+    submit = SubmitField("Submit")
+
+
 @app.route('/project', methods=["GET", "POST"])
 def set_project():
     token = session.get('token', False)
     if request.method == "POST":
         form = ProjectSelectionForm()
         form.project.choices = [(p["id"], p["name"]) for p in session["projects"]]
-
-        session["project"] = form.data["project"]
+        session["project"] = next(x for x in session["projects"] if int(x["id"]) == int(form.data["project"]))
         return redirect(url_for('add_task'))
     elif token:
         client = Client(token=token)
@@ -89,57 +83,16 @@ def set_project():
 
 
 class TaskForm(Form):
-    title = StringField("title")
-    description = TextAreaField("description")
+    title = StringField("Title:")
+    url = StringField("Url:")
     submit = SubmitField("Submit")
+    assign_to_me = BooleanField("Assign To Me")
 
 
-@app.route("/task", methods=["GET", "POST"])
+@app.route("/", methods=["GET", "POST"])
 def add_task():
     token = session.get('token', False)
-    if request.method == "GET":
-        form = TaskForm()
-        return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
-    elif token:
-        client = Client(token=token)
-        form = TaskForm()
-        task = client.tasks.create({
-            "workspace": session["workspace"]["id"],
-            "name": form.data["title"],
-            "notes": form.data["description"],
-            "assignee": session["user"]["id"],
-            "projects": [session["project"]],
-        })
-        return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
-
-
-@app.route("/")
-def index():
-    token = session.get('token', False)
-    if token:
-        if not session.get("user"):
-            client = Client(token=token)
-            me = client.users.me()
-            session["user"] = {"name": me["name"], "id": me["id"], "photo": me.get("photo", {})}
-        if not session.get("workspace"):
-            return redirect(url_for("set_workspace"))
-        if not session.get("project"):
-            return redirect(url_for("set_project"))
-
-        return render_template_string(
-            '''
-{%- if image_url -%}
-<img src="{{ image_url }}">
-{%- endif %}
-<p>Hello {{ name }}.</p>
-<p><pre>{{ dump }}</pre></p>
-<p><a href="/logout">Logout</a></p>''',
-            name=session["user"]["name"],
-            image_url=session["user"]["photo"].get('image_60x60', None),
-            dump=json.dumps(dict(session), indent=2)
-        )
-    else:
-        # show asana connect button
+    if not token:
         (auth_url, state) = Client().session.authorization_url()
         session['state'] = state
         return render_template_string(
@@ -147,12 +100,42 @@ def index():
             <p><a href="{{ auth_url }}"><img src="https://luna1.co/7df202.png"></a></p>''',
             auth_url=auth_url
         )
+    if not session.get("user"):
+        client = Client(token=token)
+        me = client.users.me()
+        session["user"] = {"name": me["name"], "id": me["id"], "photo": me.get("photo", {})}
+    if not session.get("workspace"):
+        return redirect(url_for("set_workspace"))
+    if not session.get("project"):
+        return redirect(url_for("set_project"))
+    if request.method == "GET":
+        form = TaskForm(assign_to_me=session.get("assign_to_me", False))
+        return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
+    elif request.method == "POST":
+        client = Client(token=token)
+        form = TaskForm()
+        session["assign_to_me"] = form.data["assign_to_me"]
+        task = client.tasks.create({
+            "workspace": session["workspace"]["id"],
+            "name": form.data["title"],
+            "notes": form.data["url"],
+            "assignee": session["user"]["id"] if form.data["assign_to_me"] else None,
+            "projects": [session["project"]["id"]],
+        })
+        return render_template(
+            "add_task.html",
+            form=form,
+            workspace=session["workspace"]["name"],
+            project_id=session["project"]["id"],
+            project=session["project"]["name"],
+            task_title=task["name"],
+        )
 
 
 @app.route("/logout")
 def logout():
     del session['token']
-    return redirect(url_for('index'))
+    return redirect(url_for('add_task'))
 
 
 @app.route("/auth/asana/callback")
@@ -160,9 +143,25 @@ def auth_callback():
     if request.args.get('state') == session['state']:
         del session['state']
         session['token'] = Client().session.fetch_token(code=request.args.get('code'))
-        return redirect(url_for('index'))
+        return redirect(url_for('add_task'))
     else:
         return "state doesn't match!"
+
+
+@app.route('/suggest_title')
+def suggest_title():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "must provide url"})
+    title = get_title(url)
+    if not title:
+        # make something up based on the url
+        parsed = urlparse.urlparse(url)
+        title = "{} | {}".format(
+            parsed.netloc,
+            os.path.split(os.path.splitext(parsed.path)[0])[1]
+        )
+    return jsonify({"title": title})
 
 
 @app.route('/health')
@@ -170,8 +169,10 @@ def health():
     return "Healthy!"
 
 
-app.secret_key = "I don't understand what this does."
-
 if __name__ == "__main__":
-    app.debug = True
+    app.debug = os.environ.get("FLASK_DEBUG", False)
+    if app.debug:
+        app.secret_key = "debug"
+    else:
+        app.secret_key = os.environ["FLASK_SECRET_KEY"]
     app.run()

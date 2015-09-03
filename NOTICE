@@ -1,0 +1,7 @@
+code in asana-media/reddit comes from https://github.com/reddit/reddit/blob/master/r2/r2/lib/utils/utils.py
+
+It has been modified to only include the get_title function and its
+dependencies, which infers titles from urls.
+
+All portions of the code written by reddit are Copyright (c) 2006-2015
+reddit Inc. All Rights Reserved.
