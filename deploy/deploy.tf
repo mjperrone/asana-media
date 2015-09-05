@@ -2,7 +2,7 @@ variable "config" {
     default = {
         vpc_id = "vpc-b91664dc"
         key_name = "mperrone"
-        ami = "ami-794a5a49"
+        ami = "ami-21233111"
         app_name = "asana-media"
     }
 }
