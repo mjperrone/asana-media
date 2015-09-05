@@ -10,5 +10,7 @@ function get_title() {
           // TODO: say sorry
         }
       });
+    } else {
+      // tell them to enter a url first
     }
 }

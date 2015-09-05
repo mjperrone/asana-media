@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
 {% block title %}Select Project{% endblock %}
 {% block content %}
-  <p>Select a project in workspace <a href="{{ url_for('set_workspace') }}">{{ workspace }}</a>:</p>
+  <h3>Select a project in workspace {{ workspace }}</h3>
   <form action="{{ url_for('set_project') }}" method=POST>
     {{ form.hidden_tag() }}
-    {{ form.project }}
-    {{ form.submit }}
+    {{ form.project(class='form-control') }}
+    {{ form.submit(class='btn btn-default') }}
   </form>
 {% endblock %}

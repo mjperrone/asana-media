@@ -1,11 +1,11 @@
-""""""
+"""Add urls to asana, with title suggestions!"""
 import logging
 import os
-import asana
-from flask import Flask, request, session, redirect, render_template_string, render_template, jsonify, url_for
 import urlparse
 
-from flask_wtf import Form
+import asana
+from flask import Flask, request, session, redirect, render_template_string, render_template, jsonify, url_for
+import flask_wtf
 from wtforms import SelectField, SubmitField, StringField, BooleanField
 from wtforms.validators import DataRequired
 
@@ -38,7 +38,7 @@ def Client(**kwargs):
 app = Flask(__name__)
 
 
-class WorkspaceSelectionForm(Form):
+class WorkspaceSelectionForm(flask_wtf.Form):
     workspace = SelectField("workspace", validators=[DataRequired()])
     submit = SubmitField("Submit")
 
@@ -46,12 +46,15 @@ class WorkspaceSelectionForm(Form):
 @app.route('/workspace', methods=["GET", "POST"])
 def set_workspace():
     token = session.get('token', False)
+    if not token:
+        return redirect(url_for("add_task"))
+
     if request.method == "POST":
         form = WorkspaceSelectionForm()
         form.workspace.choices = [(ws["id"], ws["name"]) for ws in session["workspaces"]]
         session["workspace"] = next(x for x in session["workspaces"] if int(x["id"]) == int(form.data["workspace"]))
         return redirect(url_for('set_project'))
-    elif token:
+    else:
         client = Client(token=token)
         me = client.users.me()
         form = WorkspaceSelectionForm()
@@ -60,7 +63,7 @@ def set_workspace():
         return render_template("select_workspace.html", name=me['name'], form=form)
 
 
-class ProjectSelectionForm(Form):
+class ProjectSelectionForm(flask_wtf.Form):
     project = SelectField("project", validators=[DataRequired()])
     submit = SubmitField("Submit")
 
@@ -68,12 +71,17 @@ class ProjectSelectionForm(Form):
 @app.route('/project', methods=["GET", "POST"])
 def set_project():
     token = session.get('token', False)
+    if not token:
+        return redirect(url_for("add_task"))
+    if not session["workspace"]:
+        return redirect(url_for("set_workspace"))
+
     if request.method == "POST":
         form = ProjectSelectionForm()
         form.project.choices = [(p["id"], p["name"]) for p in session["projects"]]
         session["project"] = next(x for x in session["projects"] if int(x["id"]) == int(form.data["project"]))
         return redirect(url_for('add_task'))
-    elif token:
+    else:  # GET
         client = Client(token=token)
         projects = list(client.projects.find_all(workspace=session["workspace"]["id"], limit=25))
         form = ProjectSelectionForm()
@@ -82,9 +90,9 @@ def set_project():
         return render_template("select_project.html", form=form, workspace=session["workspace"]["name"])
 
 
-class TaskForm(Form):
+class TaskForm(flask_wtf.Form):
     title = StringField("Title:")
-    url = StringField("Url:")
+    url = StringField("URL:")
     submit = SubmitField("Submit")
     assign_to_me = BooleanField("Assign To Me")
 
@@ -108,10 +116,11 @@ def add_task():
         return redirect(url_for("set_workspace"))
     if not session.get("project"):
         return redirect(url_for("set_project"))
+
     if request.method == "GET":
         form = TaskForm(assign_to_me=session.get("assign_to_me", False))
         return render_template("add_task.html", form=form, workspace=session["workspace"]["name"])
-    elif request.method == "POST":
+    else:  # POST
         client = Client(token=token)
         form = TaskForm()
         session["assign_to_me"] = form.data["assign_to_me"]
