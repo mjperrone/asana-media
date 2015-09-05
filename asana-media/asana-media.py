@@ -177,11 +177,11 @@ def suggest_title():
 def health():
     return "Healthy!"
 
+app.debug = os.environ.get("FLASK_DEBUG", False)
+if app.debug:
+    app.secret_key = "debug"
+else:
+    app.secret_key = os.environ["FLASK_SECRET_KEY"]
 
 if __name__ == "__main__":
-    app.debug = os.environ.get("FLASK_DEBUG", False)
-    if app.debug:
-        app.secret_key = "debug"
-    else:
-        app.secret_key = os.environ["FLASK_SECRET_KEY"]
     app.run()
