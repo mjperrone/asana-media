@@ -5,7 +5,10 @@
 {% block title %}Add Task{% endblock %}
 {% block content %}
   {% if task_title is defined %}
-    <div>Task '{{ task_title }}' successfully added to project '{{ project }}'! <a href="https://app.asana.com/0/{{ project_id }}/list"> View your full queue here</div>.
+    <div>
+      Task '{{ task_title }}' successfully added to project '{{ project }}'!
+      <a target="_blank" href="https://app.asana.com/0/{{ project_id }}/list"> View your full queue here</a>
+    </div>.
   {% endif %}
   <h3>Add a task in workspace {{ workspace }}</h3>
   <form action="{{ url_for('add_task') }}" method=POST>
