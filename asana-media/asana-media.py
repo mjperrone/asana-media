@@ -27,7 +27,7 @@ def Client(**kwargs):
     return asana.Client.oauth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
-        redirect_uri='http://localhost:5000/auth/asana/callback',
+        redirect_uri='http://asana.mikejperrone.com/auth/asana/callback',
         auto_refresh_url=asana.session.AsanaOAuth2Session.token_url,
         auto_refresh_kwargs={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET},
         token_updater=token_updater,
